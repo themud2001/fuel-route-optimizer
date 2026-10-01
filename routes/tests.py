@@ -97,10 +97,36 @@ class ApiTests(SimpleTestCase):
     def test_rejects_invalid_input(self):
         response = self.client.post(
             "/api/v1/route/",
-            data=json.dumps({"start": "Chicago", "finish": "Denver, CO"}),
+            data=json.dumps({"type": "state_names", "start": "Chicago", "finish": "Denver, CO"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_type_is_required_and_must_be_supported(self):
+        for request_type in (None, "cities"):
+            payload = {"start": "Chicago, IL", "finish": "Denver, CO"}
+            if request_type is not None:
+                payload["type"] = request_type
+            with self.subTest(request_type=request_type):
+                response = self.client.post(
+                    "/api/v1/route/", data=json.dumps(payload), content_type="application/json"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("type must be", response.json()["error"])
+
+    @patch("routes.views.get_route")
+    def test_type_must_match_location_shape(self, mocked_route):
+        payloads = [
+            {"type": "state_names", "start": {"lat": 41.8781, "lon": -87.6298}, "finish": "Denver, CO"},
+            {"type": "coordinates", "start": "Chicago, IL", "finish": {"lat": 39.7392, "lon": -104.9903}},
+        ]
+        for payload in payloads:
+            with self.subTest(request_type=payload["type"]):
+                response = self.client.post(
+                    "/api/v1/route/", data=json.dumps(payload), content_type="application/json"
+                )
+                self.assertEqual(response.status_code, 400)
+        mocked_route.assert_not_called()
 
     def test_coordinate_validation_uses_us_boundary(self):
         self.assertTrue(within_usa(-87.6298, 41.8781))  # Chicago
@@ -113,13 +139,45 @@ class ApiTests(SimpleTestCase):
         mocked_plan.return_value = {"total_fuel_cost_usd": 10}
         response = self.client.post(
             "/api/v1/route/",
-            data=json.dumps({"start": "Chicago, IL", "finish": "Denver, CO"}),
+            data=json.dumps({"type": "state_names", "start": "Chicago, IL", "finish": "Denver, CO"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["total_fuel_cost_usd"], 10)
         self.assertIn(b'\n  "total_fuel_cost_usd": 10\n', response.content)
         self.assertEqual(mocked_route.call_count, 1)
+
+    @patch("routes.views.build_plan")
+    @patch("routes.views.get_route")
+    def test_accepts_us_coordinates(self, mocked_route, mocked_plan):
+        mocked_route.return_value = {"distance_miles": 1}
+        mocked_plan.return_value = {"total_fuel_cost_usd": 10}
+        response = self.client.post(
+            "/api/v1/route/",
+            data=json.dumps({
+                "type": "coordinates",
+                "start": {"lat": 41.8781, "lon": -87.6298},
+                "finish": {"lat": 39.7392, "lon": -104.9903},
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        mocked_route.assert_called_once_with((-87.6298, 41.8781), (-104.9903, 39.7392))
+
+    @patch("routes.views.get_route")
+    def test_rejects_coordinates_outside_usa(self, mocked_route):
+        response = self.client.post(
+            "/api/v1/route/",
+            data=json.dumps({
+                "type": "coordinates",
+                "start": {"lat": 43.6532, "lon": -79.3832},  # Toronto
+                "finish": {"lat": 39.7392, "lon": -104.9903},
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("within the USA", response.json()["error"])
+        mocked_route.assert_not_called()
 
     @patch("routes.routing.urllib.request.urlopen")
     def test_identical_route_uses_one_provider_call(self, mocked_open):

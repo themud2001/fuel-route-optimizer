@@ -19,10 +19,18 @@ No API key or database migration is needed. The included station catalog is gene
 ```bash
 curl -sS http://127.0.0.1:8000/api/v1/route/ \
   -H 'Content-Type: application/json' \
-  -d '{"start":"Chicago, IL","finish":"Denver, CO"}'
+  -d '{"type":"state_names","start":"Chicago, IL","finish":"Denver, CO"}'
 ```
 
-`start` and `finish` each accept a US `"City, ST"` string or a coordinate object, for example `{"lat":41.8781,"lon":-87.6298}`. Coordinates are checked against offline US Census state boundaries. City names are resolved locally, so they need no geocoding API call. The optional `initial_fuel_gallons` field is between 0 and 50 and defaults to **50**, meaning a full tank at the start.
+For coordinates, set `type` to `"coordinates"` and provide both locations as latitude/longitude objects:
+
+```bash
+curl -sS http://127.0.0.1:8000/api/v1/route/ \
+  -H 'Content-Type: application/json' \
+  -d '{"type":"coordinates","start":{"lat":41.8781,"lon":-87.6298},"finish":{"lat":39.7392,"lon":-104.9903}}'
+```
+
+`type` is required. With `"state_names"`, `start` and `finish` must each be a US `"City, ST"` string; city names are resolved locally without a geocoding call. With `"coordinates"`, they must each be an object with numeric `lat` and `lon` inside the USA. Coordinates are checked against offline US Census state boundaries. The optional `initial_fuel_gallons` field is between 0 and 50 and defaults to **50**, meaning a full tank at the start.
 
 The response is formatted with indentation and has four top-level fields:
 
@@ -40,7 +48,7 @@ For example, to save a route map for a GeoJSON viewer:
 ```bash
 curl -sS http://127.0.0.1:8000/api/v1/route/ \
   -H 'Content-Type: application/json' \
-  -d '{"start":"Chicago, IL","finish":"Denver, CO"}' \
+  -d '{"type":"state_names","start":"Chicago, IL","finish":"Denver, CO"}' \
   | python3 -c 'import json,sys; json.dump(json.load(sys.stdin)["map"], open("route-map.geojson", "w"))'
 ```
 
@@ -56,7 +64,7 @@ The algorithm has no per-stop inconvenience cost. On a long route, it may recomm
 
 ## Data accuracy and limits
 
-- Station coordinates are **city-level estimates**, not pump locations. A recommended stop's `route_coordinate` is where the city estimate projects onto the route. The `city_coordinate_estimate` field shows the original estimate. The actual exit, access road, and detour may differ.
+- Station coordinates are **city-level estimates**, not pump locations. A fuel stop marker in the GeoJSON map is where the city estimate projects onto the route. The actual exit, access road, and detour may differ.
 - The 15 mile corridor is a straight-line approximation. Detour time and fuel, tolls, road access, and changing fuel prices are not priced into the optimization. Thus “optimal” applies to the fixed route and estimated station positions, not a verified door-to-door driving itinerary.
 - Only US rows are used: 7,531 US station-price rows from the 8,151-row attachment. Canadian rows are excluded. The list has no stations in Alaska or Hawaii, so those routes may be infeasible unless the starting tank covers the trip.
 - OSRM's public server is a best-effort demo. For a deployed service, configure `OSRM_BASE_URL` to an OSRM instance with suitable capacity and set `DJANGO_SECRET_KEY` and `DJANGO_ALLOWED_HOSTS`. The server-side route cache is per process; a shared cache would help a multi-worker deployment.

@@ -14,11 +14,15 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
-def parse_location(value) -> tuple[float, float]:
-    if isinstance(value, str):
+def parse_location(value, request_type: str) -> tuple[float, float]:
+    if request_type == "state_names":
+        if not isinstance(value, str):
+            raise ValueError("For type 'state_names', each location must be a 'City, ST' string.")
         return resolve_city(value)
+    if request_type != "coordinates":
+        raise ValueError("type must be 'state_names' or 'coordinates'.")
     if not isinstance(value, dict):
-        raise ValueError("Each location must be 'City, ST' or an object with lat and lon.")
+        raise ValueError("For type 'coordinates', each location must be an object with lat and lon.")
     try:
         lat = float(value.get("lat", value.get("latitude")))
         lon = float(value.get("lon", value.get("longitude")))
@@ -43,8 +47,11 @@ def route_plan(request):
         payload = json.loads(request.body)
         if not isinstance(payload, dict):
             raise ValueError("Request body must be a JSON object.")
-        start = parse_location(payload.get("start"))
-        finish = parse_location(payload.get("finish"))
+        request_type = payload.get("type")
+        if request_type not in ("state_names", "coordinates"):
+            raise ValueError("type must be 'state_names' or 'coordinates'.")
+        start = parse_location(payload.get("start"), request_type)
+        finish = parse_location(payload.get("finish"), request_type)
         if start == finish:
             raise ValueError("Start and finish must differ.")
         initial_gallons = float(payload.get("initial_fuel_gallons", 50))

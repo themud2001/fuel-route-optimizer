@@ -170,7 +170,20 @@ def build_plan(route: dict, start: tuple[float, float], initial_gallons: float) 
             "geometry": {"type": "LineString", "coordinates": route["coordinates"]},
         }
     ]
+    stops = []
     for number, stop in enumerate(plan["stops"], start=1):
+        stops.append(
+            {
+                "station_name": stop["station_name"],
+                "address": ", ".join(
+                    part for part in (stop["address"], stop["city"], stop["state"]) if part
+                ),
+                "mile_marker": stop["mile_marker"],
+                "price_usd_per_gallon": stop["price_usd_per_gallon"],
+                "gallons_to_buy": stop["gallons_to_buy"],
+                "cost_usd": stop["purchase_cost_usd"],
+            }
+        )
         features.append(
             {
                 "type": "Feature",
@@ -178,7 +191,6 @@ def build_plan(route: dict, start: tuple[float, float], initial_gallons: float) 
                     "kind": "fuel_stop",
                     "stop_number": number,
                     "station_name": stop["station_name"],
-                    "location_precision": "route projection from city centroid",
                 },
                 "geometry": {"type": "Point", "coordinates": stop["route_coordinate"]},
             }
@@ -187,21 +199,8 @@ def build_plan(route: dict, start: tuple[float, float], initial_gallons: float) 
         "route": {
             "distance_miles": round(route["distance_miles"], 1),
             "duration_hours": round(route["duration_hours"], 1),
-            "provider": route["provider"],
         },
-        "vehicle": {"tank_capacity_gallons": TANK_GALLONS, "max_range_miles": 500, "mpg": 10},
-        **plan,
-        "initial_fuel_price_estimate": initial_reference,
+        "stops": stops,
+        "total_fuel_cost_usd": plan["total_fuel_cost_usd"],
         "map": {"type": "FeatureCollection", "features": features},
-        "assumptions": [
-            "The route is fixed; station choices minimize fuel purchase cost along it.",
-            "Station locations are estimated from city postal coordinates, not exact pump coordinates.",
-            "Stops are considered when their city estimate is within 15 straight-line miles of the route; detour time and fuel are not included.",
-            "Total fuel cost values only the fuel consumed on this trip. Starting fuel is priced using the nearest station's city-level price as an estimate.",
-        ],
-        "attribution": {
-            "routing": "OSRM / OpenStreetMap contributors",
-            "station_locations": "GeoNames postal code data, CC BY 4.0",
-            "us_boundaries": "U.S. Census Bureau 2025 cartographic boundary files",
-        },
     }

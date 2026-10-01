@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase
 
 from .geometry import RouteProjector
-from .planner import NoFeasibleFuelPlan, optimize_fuel
+from .planner import NoFeasibleFuelPlan, build_plan, optimize_fuel
 from .routing import get_route
 from .us_boundary import within_usa
 
@@ -62,6 +62,36 @@ class FuelPlannerTests(SimpleTestCase):
         self.assertAlmostEqual(point["mile"], 30, delta=1)
         self.assertIsNone(projector.project(-99.5, 36.0, 15))
 
+    def test_public_response_contains_only_route_stops_cost_and_map(self):
+        route = {
+            "distance_miles": 1000,
+            "duration_hours": 16.2,
+            "coordinates": [[-100.0, 35.0], [-90.0, 35.0]],
+        }
+        with patch("routes.planner.candidate_stations") as mocked_stations, patch(
+            "routes.planner.origin_price"
+        ) as mocked_origin_price:
+            mocked_stations.return_value = [
+                candidate(400, 4), candidate(700, 3), candidate(900, 5)
+            ]
+            mocked_origin_price.return_value = {"price_usd_per_gallon": 3.5}
+            response = build_plan(route, (-100.0, 35.0), 50)
+
+        self.assertEqual(set(response), {"route", "stops", "total_fuel_cost_usd", "map"})
+        self.assertEqual(response["route"], {"distance_miles": 1000, "duration_hours": 16.2})
+        self.assertEqual(response["total_fuel_cost_usd"], 345)
+        self.assertEqual(len(response["stops"]), 2)
+        self.assertEqual(
+            set(response["stops"][0]),
+            {
+                "station_name", "address", "mile_marker", "price_usd_per_gallon",
+                "gallons_to_buy", "cost_usd",
+            },
+        )
+        self.assertEqual(response["stops"][0]["address"], "I-1, Test, TX")
+        self.assertEqual(len(response["map"]["features"]), 3)
+        self.assertEqual(response["map"]["features"][1]["properties"]["stop_number"], 1)
+
 
 class ApiTests(SimpleTestCase):
     def test_rejects_invalid_input(self):
@@ -88,6 +118,7 @@ class ApiTests(SimpleTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["total_fuel_cost_usd"], 10)
+        self.assertIn(b'\n  "total_fuel_cost_usd": 10\n', response.content)
         self.assertEqual(mocked_route.call_count, 1)
 
     @patch("routes.routing.urllib.request.urlopen")

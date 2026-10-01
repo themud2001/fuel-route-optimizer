@@ -24,16 +24,16 @@ curl -sS http://127.0.0.1:8000/api/v1/route/ \
 
 `start` and `finish` each accept a US `"City, ST"` string or a coordinate object, for example `{"lat":41.8781,"lon":-87.6298}`. Coordinates are checked against offline US Census state boundaries. City names are resolved locally, so they need no geocoding API call. The optional `initial_fuel_gallons` field is between 0 and 50 and defaults to **50**, meaning a full tank at the start.
 
-The response includes:
+The response is formatted with indentation and has four top-level fields:
 
 | Field | Meaning |
 | --- | --- |
-| `map` | GeoJSON FeatureCollection containing the route line and fuel stop markers. |
-| `route` | Driving distance, estimated duration, and provider. |
-| `stops` | Ordered station names, address labels, mile markers, estimated locations, price, gallons to buy, and purchase cost. |
+| `route` | Driving distance in miles and estimated duration in hours. |
+| `stops` | Ordered fuel stops. Each has a station name, full address, route mile marker, price per gallon, gallons to buy, and purchase cost. |
 | `total_fuel_cost_usd` | Estimated value of all fuel **consumed** on the trip, including fuel already in the tank at departure. |
-| `en_route_purchases_usd` | Actual modeled cash purchases at recommended stops after departure. |
-| `initial_fuel_consumed_value_usd` | Consumed starting fuel, valued at the nearest listed station's price. |
+| `map` | GeoJSON FeatureCollection containing the route line and numbered fuel stop markers. |
+
+The price of starting fuel is estimated using the nearest listed station. Station map markers are projected from city-level estimates onto the route; they are not exact pump coordinates. The detailed assumptions and source attribution are documented below rather than repeated in every API response.
 
 For example, to save a route map for a GeoJSON viewer:
 

@@ -54,7 +54,10 @@ def route_plan(request):
         return JsonResponse({"error": str(exc)}, status=400)
     try:
         route = get_route(start, finish)
-        return JsonResponse(build_plan(route, start, initial_gallons))
+        return JsonResponse(
+            build_plan(route, start, initial_gallons),
+            json_dumps_params={"indent": 2, "ensure_ascii": False},
+        )
     except RoutingError as exc:
         return JsonResponse({"error": str(exc)}, status=502)
     except NoFeasibleFuelPlan as exc:

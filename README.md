@@ -1,5 +1,23 @@
 # Fuel Route Optimizer
 
+## Screenshots
+
+### Route on geojson.io
+
+The response's `map` field displays the Chicago–Denver route and two fuel stop markers in [geojson.io](https://geojson.io/).
+
+![Chicago to Denver GeoJSON route and coordinates on geojson.io](docs/screenshots/geojson-route.jpg)
+
+### API response: city and state names
+
+![Request and response using state_names](docs/screenshots/state-names-response.jpg)
+
+### API response: coordinates
+
+![Request and response using coordinates](docs/screenshots/coordinates-response.jpg)
+
+Both requests calculate the same trip; only the input format differs.
+
 A Django 6.1 API that returns a US driving route, recommended fuel purchases along it, a GeoJSON map, and an estimated total trip fuel cost. It uses the supplied truckstop price CSV. For each new route it makes **one** request to the free [OSRM routing API](https://project-osrm.org/), then evaluates the fuel prices locally. Repeated routes are cached for 24 hours per application process.
 
 ## Run locally
@@ -53,24 +71,6 @@ curl -sS http://127.0.0.1:8000/api/v1/route/ \
 ```
 
 `GET /health/` provides a simple health check. Invalid inputs return HTTP 400, unavailable/no route responses return 502, and routes that cannot be driven within the tank range using known stops return 422.
-
-## Screenshots
-
-Both requests below calculate the same Chicago–Denver trip. The response includes the route summary, fuel stops, total fuel cost, and a GeoJSON map.
-
-### City and state names
-
-![Request and response using state_names](docs/screenshots/state-names-response.jpg)
-
-### Coordinates
-
-![Request and response using coordinates](docs/screenshots/coordinates-response.jpg)
-
-### Route on geojson.io
-
-The response's `map` field displays the route line and two fuel stop markers in [geojson.io](https://geojson.io/).
-
-![Chicago to Denver GeoJSON route and coordinates on geojson.io](docs/screenshots/geojson-route.jpg)
 
 ## How the plan works
 
